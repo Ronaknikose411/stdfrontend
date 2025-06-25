@@ -1,42 +1,65 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react'; // Add useEffect import
 import axios from 'axios';
 
 function MarkForm({ show, onClose, onSuccess, parentId }) {
   const [subject, setSubject] = useState('');
   const [score, setScore] = useState('');
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [localParentId, setLocalParentId] = useState(parentId || '');
+
+  useEffect(() => {
+    setLocalParentId(parentId || '');
+  }, [parentId]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+
     // Validate inputs
+    if (!localParentId) {
+      setError('Parent ID is required.');
+      setIsSubmitting(false);
+      return;
+    }
     if (!subject || !score) {
       setError('Subject and Score are required.');
+      setIsSubmitting(false);
       return;
     }
     if (isNaN(Number(score)) || Number(score) < 0 || Number(score) > 100) {
       setError('Score must be a number between 0 and 100.');
+      setIsSubmitting(false);
       return;
     }
 
-    const mark = { subject, score: Number(score) }; // Only subject and score
-    const payload = [mark]; // Wrap in an array as per API requirement
-    console.log('Submitting mark data:', { parentId, marks: payload });
+    const mark = { subject, score: Number(score) };
+    const payload = { marks: [mark] };
+    console.log('Submitting mark data:', { parentId: String(localParentId), marks: JSON.stringify(payload, null, 2) });
 
     try {
-      const response = await axios.post(`http://localhost:5656/api/students/mark/add/${parentId}`, payload);
-      console.log('Add mark response:', response.data);
-      setSubject('');
-      setScore('');
-      setError('');
-      onSuccess(response.data);
-      onClose();
+      // Validate parentId existence
+      await axios.get(`http://localhost:5656/api/students/view/${String(localParentId)}`);
+      const response = await axios.post(`http://localhost:5656/api/students/mark/add/${String(localParentId)}`, payload);
+      console.log('Add mark response:', JSON.stringify(response.data, null, 2));
+      if (response.status === 201) {
+        setSubject('');
+        setScore('');
+        setError('');
+        onSuccess(response.data);
+        onClose();
+      }
     } catch (error) {
       console.error('Error adding mark:', {
         message: error.message,
         response: error.response?.data,
         status: error.response?.status,
       });
-      setError(`Error adding mark: ${error.response?.data?.error || error.message}`);
+      const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message;
+      setError(`Error adding mark: ${errorMessage}`);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -58,6 +81,9 @@ function MarkForm({ show, onClose, onSuccess, parentId }) {
                 onClick={() => {
                   onClose();
                   setError('');
+                  setSubject('');
+                  setScore('');
+                  setLocalParentId(parentId || '');
                 }}
                 aria-label="Close"
               ></button>
@@ -70,8 +96,9 @@ function MarkForm({ show, onClose, onSuccess, parentId }) {
                   <input
                     type="text"
                     className="form-control"
-                    value={parentId || ''}
-                    readOnly // Make it read-only since it's pre-filled
+                    value={localParentId}
+                    onChange={(e) => setLocalParentId(e.target.value)}
+                    placeholder="Enter Parent ID"
                   />
                 </div>
                 <div className="mb-3">
@@ -96,8 +123,8 @@ function MarkForm({ show, onClose, onSuccess, parentId }) {
                     required
                   />
                 </div>
-                <button type="submit" className="btn btn-primary">
-                  Add Mark
+                <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+                  {isSubmitting ? 'Adding...' : 'Add Mark'}
                 </button>
               </form>
             </div>

@@ -12,14 +12,16 @@ function Marks() {
   const [selectedMark, setSelectedMark] = useState(null);
   const [message, setMessage] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [addParentId, setAddParentId] = useState('');
 
   const fetchMarks = async () => {
     try {
       const response = await axios.get('http://localhost:5656/api/students/mark/viewallwithmarks');
-      console.log('fetchMarks response:', response.data);
+      console.log('fetchMarks response:', JSON.stringify(response.data, null, 2));
       const data = Array.isArray(response.data.data) ? response.data.data : [];
-      console.log('Setting marks:', data);
+      console.log('Setting marks:', JSON.stringify(data, null, 2));
       setMarks(data);
+      console.log('Marks state after setMarks:', JSON.stringify(data, null, 2));
       if (data.length === 0) {
         setMessage('No marks found in the database.');
       } else {
@@ -31,7 +33,7 @@ function Marks() {
         response: error.response?.data,
         status: error.response?.status,
       });
-      setMessage(`Error fetching marks: ${error.response?.data?.error || error.message}`);
+      setMessage(`Error retrieving marks: ${error.response?.data?.error || error.message}`);
       setMarks([]);
       setTimeout(() => setMessage(''), 5000);
     }
@@ -48,15 +50,28 @@ function Marks() {
       return;
     }
     try {
-      const response = await axios.get(`http://localhost:5656/api/students/mark/view/${searchParentId}`);
-      console.log('handleSearch response:', response.data);
-      const data = Array.isArray(response.data.data) ? response.data.data : [];
-      console.log('Setting marks after search:', data);
-      setMarks(data);
-      if (data.length === 0) {
+      // Fetch marks
+      const marksResponse = await axios.get(`http://localhost:5656/api/students/mark/view/${searchParentId}`);
+      console.log('handleSearch marks response:', JSON.stringify(marksResponse.data, null, 2));
+      const marksData = Array.isArray(marksResponse.data.data) ? marksResponse.data.data : [];
+
+      // Fetch student to get name
+      const studentResponse = await axios.get(`http://localhost:5656/api/students/view/${searchParentId}`);
+      console.log('handleSearch student response:', JSON.stringify(studentResponse.data, null, 2));
+      const student = studentResponse.data.data;
+
+      // Combine data
+      const combinedData = marksData.map(mark => ({
+        ...mark,
+        name: student?.name || 'N/A',
+      }));
+
+      console.log('Setting marks after search:', JSON.stringify(combinedData, null, 2));
+      setMarks(combinedData);
+      if (combinedData.length === 0) {
         setMessage(`No marks found for Parent ID: ${searchParentId}`);
       } else {
-        setMessage(`Found ${data.length} mark(s) for Parent ID: ${searchParentId}`);
+        setMessage(`Found ${combinedData.length} mark(s) for Parent ID: ${searchParentId}`);
       }
     } catch (error) {
       console.error('Error searching marks:', {
@@ -64,8 +79,8 @@ function Marks() {
         response: error.response?.data,
         status: error.response?.status,
       });
-      setMarks([]);
       setMessage(`Error searching marks: ${error.response?.data?.error || error.message}`);
+      setMarks([]);
       setTimeout(() => setMessage(''), 5000);
     }
   };
@@ -77,7 +92,7 @@ function Marks() {
   };
 
   const handleUpdate = (mark) => {
-    console.log('Preparing to update mark:', mark);
+    console.log('Preparing to update mark:', JSON.stringify(mark, null, 2));
     setSelectedMark(mark);
     setModalAction('update');
     setShowModal(true);
@@ -87,16 +102,14 @@ function Marks() {
     try {
       if (modalAction === 'delete') {
         await axios.delete(`http://localhost:5656/api/students/mark/delete/${selectedMark}`);
-        setMessage('Mark deleted successfully');
+        setMessage('Mark deleted successfully!');
       } else if (modalAction === 'update' && selectedMark) {
         const payload = {
-          subject: selectedMark.subject,
-          score: Number(selectedMark.score),
-          parentId: selectedMark.parentId,
+          marks: [{ subject: selectedMark.subject, score: Number(selectedMark.score) }],
         };
-        console.log('Updating mark with payload:', payload);
+        console.log('Updating mark with payload:', JSON.stringify(payload, null, 2));
         await axios.put(`http://localhost:5656/api/students/mark/update/${selectedMark.parentId}`, payload);
-        setMessage('Mark updated successfully');
+        setMessage('Mark updated successfully!');
       }
       fetchMarks();
       setShowModal(false);
@@ -113,18 +126,39 @@ function Marks() {
   };
 
   const handleAddSuccess = (newMark) => {
-    console.log('New mark added:', newMark);
-    setMessage('Mark added successfully');
+    console.log('New mark added:', JSON.stringify(newMark, null, 2));
+    setMessage('Mark added successfully!');
     fetchMarks();
     setShowAddModal(false);
+    setAddParentId('');
     setTimeout(() => setMessage(''), 5000);
   };
 
+  const handleAddClick = (parentId) => {
+    console.log('handleAddClick with parentId:', parentId);
+    setAddParentId(parentId);
+    setShowAddModal(true);
+  };
+
   return (
-    <div>
-      <h2>Marks</h2>
-      {message && <div className="alert alert-info">{message}</div>}
-    
+    <div className="container mt-4">
+      <h2>Marks Management</h2>
+      {message && (
+        <div className={`alert ${message.includes('Error') ? 'alert-danger' : 'alert-success'}`} role="alert">
+          {message}
+        </div>
+      )}
+      <div className="d-flex justify-content-end mb-3">
+        <button
+          className="btn btn-primary"
+          onClick={() => {
+            setAddParentId('');
+            setShowAddModal(true);
+          }}
+        >
+          Add Mark
+        </button>
+      </div>
       <div className="mb-3">
         <div className="input-group">
           <input
@@ -139,11 +173,20 @@ function Marks() {
           </button>
         </div>
       </div>
-      <MarkList marks={marks} onDelete={handleDelete} onUpdate={handleUpdate} />
+      <MarkList
+        marks={marks}
+        onDelete={handleDelete}
+        onUpdate={handleUpdate}
+        onAddClick={handleAddClick}
+      />
       <MarkForm
         show={showAddModal}
-        onClose={() => setShowAddModal(false)}
+        onClose={() => {
+          setShowAddModal(false);
+          setAddParentId('');
+        }}
         onSuccess={handleAddSuccess}
+        parentId={addParentId}
       />
       <ConfirmationModal
         show={showModal}

@@ -1,10 +1,7 @@
 import { useState } from 'react';
-import MarkForm from './MarkForm.jsx'; // Add this import
 
-function MarkList({ marks, onDelete, onUpdate, onAdd }) {
+function MarkList({ marks, onDelete, onUpdate, onAddClick }) {
   const [editMark, setEditMark] = useState(null);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [selectedParentId, setSelectedParentId] = useState(null);
 
   const handleEditChange = (e, field) => {
     setEditMark({ ...editMark, [field]: e.target.value });
@@ -13,11 +10,6 @@ function MarkList({ marks, onDelete, onUpdate, onAdd }) {
   const handleEditSubmit = () => {
     onUpdate(editMark);
     setEditMark(null);
-  };
-
-  const handleAddClick = (parentId) => {
-    setSelectedParentId(parentId);
-    setShowAddForm(true);
   };
 
   if (!Array.isArray(marks) || marks.length === 0) {
@@ -41,8 +33,8 @@ function MarkList({ marks, onDelete, onUpdate, onAdd }) {
           </tr>
         </thead>
         <tbody>
-          {marks.map((mark, index) => (
-            <tr key={mark.id || mark.parentId || index}>
+          {marks.map((mark) => (
+            <tr key={mark.id}> {/* Use mark.id for unique key */}
               {editMark && editMark.id === mark.id ? (
                 <>
                   <td>{mark.parentId}</td>
@@ -58,7 +50,7 @@ function MarkList({ marks, onDelete, onUpdate, onAdd }) {
                     <input
                       type="text"
                       className="form-control"
-                      value={editMark.subject}
+                      value={editMark.subject || ''}
                       onChange={(e) => handleEditChange(e, 'subject')}
                     />
                   </td>
@@ -66,7 +58,7 @@ function MarkList({ marks, onDelete, onUpdate, onAdd }) {
                     <input
                       type="number"
                       className="form-control"
-                      value={editMark.score}
+                      value={editMark.score || ''}
                       onChange={(e) => handleEditChange(e, 'score')}
                     />
                   </td>
@@ -83,8 +75,8 @@ function MarkList({ marks, onDelete, onUpdate, onAdd }) {
                 <>
                   <td>{mark.parentId}</td>
                   <td>{mark.name || 'N/A'}</td>
-                  <td>{mark.subject}</td>
-                  <td>{mark.score}</td>
+                  <td>{mark.subject || 'N/A'}</td>
+                  <td>{mark.score !== undefined ? mark.score : 'N/A'}</td>
                   <td>
                     <button
                       className="btn btn-warning me-2"
@@ -100,7 +92,7 @@ function MarkList({ marks, onDelete, onUpdate, onAdd }) {
                     </button>
                     <button
                       className="btn btn-primary"
-                      onClick={() => handleAddClick(mark.parentId)}
+                      onClick={() => onAddClick(mark.parentId)}
                     >
                       Add Mark
                     </button>
@@ -111,14 +103,6 @@ function MarkList({ marks, onDelete, onUpdate, onAdd }) {
           ))}
         </tbody>
       </table>
-      {showAddForm && (
-        <MarkForm
-          show={showAddForm}
-          onClose={() => setShowAddForm(false)}
-          onSuccess={onAdd}
-          parentId={selectedParentId}
-        />
-      )}
     </>
   );
 }

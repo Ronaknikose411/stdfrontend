@@ -42,33 +42,34 @@ function Students() {
   }, []);
 
   const handleSearch = async () => {
-    if (!searchParentId) {
-      fetchStudents();
-      setMessage('');
-      return;
+  if (!searchParentId) {
+    fetchStudents();
+    setMessage('');
+    return;
+  }
+  try {
+    const response = await axios.get(`http://localhost:5656/api/students/view/${searchParentId}`);
+    console.log('handleSearch response:', response.data);
+    // Handle single student object by wrapping it in an array
+    const data = response.data ? [response.data] : [];
+    console.log('Setting students after search:', data);
+    setStudents(data);
+    if (data.length === 0) {
+      setMessage(`No student found for Parent ID: ${searchParentId}`);
+    } else {
+      setMessage(`Found ${data.length} student(s) for Parent ID: ${searchParentId}`);
     }
-    try {
-      const response = await axios.get(`http://localhost:5656/api/students/view/${searchParentId}`);
-      console.log('handleSearch response:', response.data);
-      const data = Array.isArray(response.data.data) ? response.data.data : [];
-      console.log('Setting students after search:', data);
-      setStudents(data);
-      if (data.length === 0) {
-        setMessage(`No student found for Parent ID: ${searchParentId}`);
-      } else {
-        setMessage(`Found ${data.length} student(s) for Parent ID: ${searchParentId}`);
-      }
-    } catch (error) {
-      console.error('Error searching student:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-      });
-      setStudents([]);
-      setMessage(`Error searching student: ${error.response?.data?.error || error.message}`);
-      setTimeout(() => setMessage(''), 5000);
-    }
-  };
+  } catch (error) {
+    console.error('Error searching student:', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+    });
+    setStudents([]);
+    setMessage(`Error searching student: ${error.response?.data?.error || error.message}`);
+    setTimeout(() => setMessage(''), 5000);
+  }
+};
 
   const handleDelete = (parentId) => {
     setSelectedStudent(parentId);
